@@ -89,6 +89,43 @@ export class GeminiService {
   }
   
   /**
+   * Generate a title for a conversation based on its content
+   * @param messages The conversation messages
+   */
+  async generateConversationTitle(messages: Array<{ role: string; content: string }>) {
+    try {
+      if (messages.length < 2) {
+        return "New Conversation"; // Not enough context yet
+      }
+      
+      // Create a simple prompt for title generation
+      const prompt = `Based on the following conversation, generate a short, descriptive title (max 6 words) that captures the main topic. Do not use quotes in the response. Only respond with the title text.
+
+Conversation:
+${messages.map(m => `${m.role.toUpperCase()}: ${m.content.substring(0, 100)}${m.content.length > 100 ? '...' : ''}`).join('\n')}`;
+      
+      console.log("Generating title for conversation");
+      
+      // Use the real API if available
+      if (this.useRealApi && this.genAI) {
+        const model = this.genAI.getGenerativeModel({ model: this.modelName });
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const title = response.text().trim();
+        
+        // Ensure the title is not too long
+        return title.length > 50 ? title.substring(0, 47) + "..." : title;
+      }
+      
+      // Mock implementation for testing
+      return "Generated Conversation Title";
+    } catch (error) {
+      console.error('Error generating conversation title:', error);
+      return "New Conversation"; // Fallback title
+    }
+  }
+  
+  /**
    * Generate a mock response for testing purposes
    */
   private generateMockResponse(prompt: string): string {

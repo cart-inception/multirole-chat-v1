@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useChatStore } from '../store/chat.store';
 import ChatHistory from '../components/chat/ChatHistory';
@@ -9,10 +9,12 @@ import { MessageSquare } from 'lucide-react';
 const ChatPage = () => {
   const { conversationId } = useParams<{ conversationId?: string }>();
   const navigate = useNavigate();
+  const [isPolling, setIsPolling] = useState(false);
   
   const {
     currentConversation,
     fetchConversation,
+    silentlyFetchConversation,
     createConversation,
     sendMessage,
     isLoading,
@@ -40,6 +42,52 @@ const ChatPage = () => {
     }
   }, [conversationId]);
 
+  // Polling mechanism to check for updates after sending a message
+  useEffect(() => {
+    let pollingInterval: number | null = null;
+    let pollCount = 0; // Track poll count inside the effect
+    
+    if (isPolling && conversationId) {
+      // Poll every 2 seconds for up to 60 seconds (30 polls)
+      pollingInterval = window.setInterval(() => {
+        silentlyFetchConversation(conversationId)
+          .then((conversation) => {
+            // Update poll count and check if we should stop polling
+            pollCount++;
+            
+            const messages = conversation?.messages || [];
+            
+            // Stop polling if we have at least 2 messages (user + AI) and the last one is from AI
+            // or if we've polled 30 times (60 seconds)
+            if ((messages.length >= 2 && messages[messages.length - 1]?.senderType === 'AI') || pollCount >= 30) {
+              console.log(`Polling complete after ${pollCount} attempts`);
+              setIsPolling(false);
+              if (pollingInterval) {
+                window.clearInterval(pollingInterval);
+              }
+            }
+          })
+          .catch(() => {
+            // If there's an error, increment the poll count
+            pollCount++;
+            if (pollCount >= 30) {
+              console.log(`Polling stopped after ${pollCount} attempts due to errors`);
+              setIsPolling(false);
+              if (pollingInterval) {
+                window.clearInterval(pollingInterval);
+              }
+            }
+          });
+      }, 2000);
+    }
+    
+    return () => {
+      if (pollingInterval) {
+        window.clearInterval(pollingInterval);
+      }
+    };
+  }, [isPolling, conversationId]);
+
   // Handle sending a new message
   const handleSendMessage = async (content: string) => {
     if (!currentConversation) {
@@ -47,6 +95,9 @@ const ChatPage = () => {
     }
     
     try {
+      // Start polling after sending a message
+      setIsPolling(true);
+      
       await sendMessage({
         conversationId: currentConversation.id,
         content,

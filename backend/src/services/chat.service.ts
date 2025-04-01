@@ -107,53 +107,60 @@ export class ChatService {
         throw new ApiError('Not authorized to access this conversation', 403);
       }
 
-      // Begin transaction to ensure both user message and AI response are saved together
-      return await prisma.$transaction(
-        async (tx) => {
-          // Save the user's message
-          const userMessage = await tx.message.create({
-            data: {
-              conversationId: data.conversationId,
-              content: data.content,
-              senderType: SenderType.USER,
-            },
-          });
-
-          // Prepare conversation history for context
-          const history = conversation.messages.map(message => ({
-            role: message.senderType === SenderType.USER ? 'user' : 'model',
-            content: message.content,
-          }));
-
-          // Get AI response
-          const aiResponseContent = await geminiService.generateResponse(data.content, history);
-
-          // Save the AI's response
-          const aiMessage = await tx.message.create({
-            data: {
-              conversationId: data.conversationId,
-              content: aiResponseContent,
-              senderType: SenderType.AI,
-            },
-          });
-
-          // Update conversation's updatedAt timestamp
-          await tx.conversation.update({
-            where: { id: data.conversationId },
-            data: { updatedAt: new Date() },
-          });
-
-          // Return both messages
-          return {
-            userMessage,
-            aiMessage,
-          };
+      // Step 1: Save the user's message first
+      const userMessage = await prisma.message.create({
+        data: {
+          conversationId: data.conversationId,
+          content: data.content,
+          senderType: SenderType.USER,
         },
-        {
-          // Increase transaction timeout to 30 seconds to accommodate longer AI response times
-          timeout: 30000
-        }
-      );
+      });
+
+      // Prepare conversation history for context
+      const history = conversation.messages.map(message => ({
+        role: message.senderType === SenderType.USER ? 'user' : 'model',
+        content: message.content,
+      }));
+
+      try {
+        // Step 2: Get AI response - this can take longer
+        const aiResponseContent = await geminiService.generateResponse(data.content, history);
+
+        // Step 3: Save the AI's response
+        const aiMessage = await prisma.message.create({
+          data: {
+            conversationId: data.conversationId,
+            content: aiResponseContent,
+            senderType: SenderType.AI,
+          },
+        });
+
+        // Step 4: Update conversation's updatedAt timestamp
+        await prisma.conversation.update({
+          where: { id: data.conversationId },
+          data: { updatedAt: new Date() },
+        });
+
+        // Auto update conversation title
+        await this.autoUpdateConversationTitle(userId, data.conversationId);
+
+        // Return both messages
+        return {
+          userMessage,
+          aiMessage,
+        };
+      } catch (error) {
+        console.error("Error generating or saving AI response:", error);
+        
+        // Even if AI response fails, we want to return the user message
+        // and indicate there was a problem with AI response
+        return {
+          userMessage,
+          error: error instanceof ApiError 
+            ? error.message 
+            : "Failed to generate AI response. Please try again."
+        };
+      }
     } catch (error) {
       if (error instanceof ApiError) throw error;
       console.error('Error sending message:', error);
@@ -189,6 +196,79 @@ export class ChatService {
       if (error instanceof ApiError) throw error;
       console.error('Error deleting conversation:', error);
       throw new ApiError('Failed to delete conversation', 500);
+    }
+  }
+
+  /**
+   * Generate a title for a conversation based on its content
+   * @param conversationId The ID of the conversation
+   */
+  async generateConversationTitle(userId: string, conversationId: string): Promise<string> {
+    try {
+      // Get conversation from database
+      const conversation = await prisma.conversation.findFirstOrThrow({
+        where: {
+          id: conversationId,
+          userId,
+        },
+        include: {
+          messages: true,
+        },
+      });
+      
+      // Format messages for the AI service
+      const messages = conversation.messages.map(msg => ({
+        role: msg.senderType === SenderType.USER ? 'user' : 'assistant',
+        content: msg.content,
+      }));
+      
+      // Generate title using Gemini API
+      const title = await geminiService.generateConversationTitle(messages);
+      
+      // Update conversation title in database
+      await prisma.conversation.update({
+        where: {
+          id: conversationId,
+        },
+        data: {
+          title,
+        },
+      });
+      
+      return title;
+    } catch (error) {
+      console.error('Error generating conversation title:', error);
+      return 'New Conversation';
+    }
+  }
+
+  /**
+   * Automatically update conversation title after a few messages
+   * @param userId The user ID
+   * @param conversationId The conversation ID
+   */
+  async autoUpdateConversationTitle(userId: string, conversationId: string): Promise<void> {
+    try {
+      // Get conversation
+      const conversation = await prisma.conversation.findFirstOrThrow({
+        where: {
+          id: conversationId,
+          userId,
+        },
+        include: {
+          messages: true,
+        },
+      });
+      
+      // Only update title if it's still the default or if we have enough context
+      if (
+        (conversation.title === 'New Conversation' || !conversation.title) &&
+        conversation.messages.length >= 2
+      ) {
+        await this.generateConversationTitle(userId, conversationId);
+      }
+    } catch (error) {
+      console.error('Error auto-updating conversation title:', error);
     }
   }
 }

@@ -6,30 +6,37 @@ import { CreateConversationDto, CreateMessageDto } from '../dtos/chat.dto';
 
 const router = Router();
 
-// All chat routes require authentication
+// Apply authentication middleware to all routes
 router.use(authMiddleware);
 
-// POST /api/chat/conversations - Create a new conversation
-router.post(
-  '/conversations',
-  validateRequest(CreateConversationDto),
-  chatController.createConversation
-);
+// Create a new conversation
+router.post('/conversations', validateRequest(CreateConversationDto), function(req, res, next) {
+  chatController.createConversation(req, res, next);
+});
 
-// GET /api/chat/conversations - Get all user conversations
-router.get('/conversations', chatController.getUserConversations);
+// Get all conversations
+router.get('/conversations', function(req, res, next) {
+  chatController.getUserConversations(req, res, next);
+});
 
-// GET /api/chat/conversations/:id - Get a specific conversation
-router.get('/conversations/:id', chatController.getConversation);
+// Get a conversation by ID
+router.get('/conversations/:id', function(req, res, next) {
+  chatController.getConversation(req, res, next);
+});
 
-// DELETE /api/chat/conversations/:id - Delete a conversation
-router.delete('/conversations/:id', chatController.deleteConversation);
+// Delete a conversation
+router.delete('/conversations/:id', function(req, res, next) {
+  chatController.deleteConversation(req, res, next);
+});
 
-// POST /api/chat/messages - Send a message and get AI response
-router.post(
-  '/messages',
-  validateRequest(CreateMessageDto),
-  chatController.sendMessage
-);
+// Send a message to a conversation
+router.post('/conversations/:id/messages', validateRequest(CreateMessageDto), function(req, res, next) {
+  chatController.sendMessage(req, res, next);
+});
+
+// Generate a title for a conversation
+router.post('/conversations/:id/generate-title', function(req, res, next) {
+  chatController.generateConversationTitle(req, res, next);
+});
 
 export default router;

@@ -30,7 +30,8 @@ export interface Message {
 
 export interface MessagesResponse {
   userMessage: Message;
-  aiMessage: Message;
+  aiMessage?: Message;
+  error?: string;
 }
 
 // Chat API service
@@ -75,10 +76,18 @@ const ChatApi = {
       message: string; 
       data: MessagesResponse;
     }>(
-      '/chat/messages',
-      data
+      `/chat/conversations/${data.conversationId}/messages`,
+      { content: data.content }
     );
     return response.data;
+  },
+  
+  // Generate a title for a conversation
+  generateConversationTitle: async (conversationId: string) => {
+    const response = await api.post<{ success: boolean; message: string; data: { title: string } }>(
+      `/chat/conversations/${conversationId}/generate-title`
+    );
+    return response.data.data.title;
   },
 };
 

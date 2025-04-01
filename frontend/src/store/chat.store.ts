@@ -16,8 +16,10 @@ interface ChatState {
   // Actions for conversations
   fetchConversations: () => Promise<void>;
   fetchConversation: (conversationId: string) => Promise<void>;
+  silentlyFetchConversation: (conversationId: string) => Promise<Conversation>;
   createConversation: (data: CreateConversationPayload) => Promise<Conversation>;
   deleteConversation: (conversationId: string) => Promise<void>;
+  generateConversationTitle: (conversationId: string) => Promise<string>;
   setCurrentConversation: (conversation: Conversation | null) => void;
   
   // Actions for messages
@@ -69,6 +71,37 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
   
+  // Silently fetch a conversation without changing loading state (for polling)
+  silentlyFetchConversation: async (conversationId) => {
+    try {
+      const response = await ChatApi.getConversation(conversationId);
+      const fetchedConversation = response.data;
+      
+      // Only update if the messages have changed (new message or message content changed)
+      const currentConvo = get().currentConversation;
+      if (currentConvo && currentConvo.id === fetchedConversation.id) {
+        const currentMsgCount = currentConvo.messages?.length || 0;
+        const newMsgCount = fetchedConversation.messages?.length || 0;
+        
+        // Check if we have a new message or if the last message content has changed
+        if (newMsgCount > currentMsgCount || 
+            (currentMsgCount > 0 && newMsgCount > 0 && 
+             currentConvo.messages?.[currentMsgCount - 1]?.content !== 
+             fetchedConversation.messages?.[newMsgCount - 1]?.content)) {
+          
+          set({
+            currentConversation: fetchedConversation,
+          });
+        }
+      }
+      
+      return fetchedConversation;
+    } catch (error: any) {
+      // Silent error handling - just return current conversation
+      return get().currentConversation || {} as Conversation;
+    }
+  },
+  
   // Create a new conversation
   createConversation: async (data) => {
     try {
@@ -113,6 +146,41 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
   
+  // Generate a title for a conversation
+  generateConversationTitle: async (conversationId) => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      const title = await ChatApi.generateConversationTitle(conversationId);
+      
+      // Update conversation title in state
+      set((state) => {
+        // Update in conversations list
+        const updatedConversations = state.conversations.map(c => 
+          c.id === conversationId ? { ...c, title } : c
+        );
+        
+        // Update current conversation if it matches
+        const updatedCurrentConversation = 
+          state.currentConversation?.id === conversationId
+            ? { ...state.currentConversation, title }
+            : state.currentConversation;
+        
+        return {
+          conversations: updatedConversations,
+          currentConversation: updatedCurrentConversation,
+          isLoading: false,
+        };
+      });
+      
+      return title;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Failed to generate conversation title';
+      set({ error: errorMessage, isLoading: false });
+      throw new Error(errorMessage);
+    }
+  },
+  
   // Set the current conversation
   setCurrentConversation: (conversation) => {
     set({ currentConversation: conversation });
@@ -124,7 +192,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set({ isLoading: true, error: null });
       
       const response = await ChatApi.sendMessage(data);
-      const { userMessage, aiMessage } = response.data;
+      const { userMessage, aiMessage, error: aiError } = response.data;
       
       // Update conversation with new messages
       set((state) => {
@@ -133,8 +201,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const updatedMessages = [
             ...(state.currentConversation.messages || []),
             userMessage,
-            aiMessage,
           ];
+          
+          // Only add AI message if it exists (not failed)
+          if (aiMessage) {
+            updatedMessages.push(aiMessage);
+          }
           
           return {
             currentConversation: {
@@ -142,10 +214,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
               messages: updatedMessages,
             },
             isLoading: false,
+            // If there was an AI error, set it in the state
+            error: aiError || null,
           };
         }
         
-        return { isLoading: false };
+        return { isLoading: false, error: aiError || null };
       });
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || 'Failed to send message';
