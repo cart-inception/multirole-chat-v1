@@ -4,14 +4,11 @@ import { ApiError } from '../middleware/error.middleware';
 
 /**
  * Service for interacting with the Google Gemini API
- * 
- * MODIFIED FOR TESTING: This implementation uses a mock response
- * instead of actually calling the Gemini API
  */
 export class GeminiService {
   private genAI: GoogleGenerativeAI | null = null;
-  private modelName = 'gemini-pro'; // Using gemini-pro model
-  private useRealApi = false; // Set to true to use real API
+  private modelName = 'gemini-2.5-pro-exp-03-25'; // Updated to use gemini-2.5-pro model
+  private useRealApi = true; // Set to true to use real API
 
   constructor() {
     // Check if API key is configured and we want to use the real API
