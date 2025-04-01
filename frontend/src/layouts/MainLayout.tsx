@@ -1,8 +1,8 @@
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { 
-  Menu, X, LogOut, Plus, MessageSquare, Settings, 
-  User, Moon, Sun, Trash2, Edit, ArrowLeftRight 
+  Menu, X, LogOut, Plus, MessageSquare, 
+  Moon, Sun, Trash2, ArrowLeftRight 
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth.store';
 import { useChatStore } from '../store/chat.store';
@@ -95,7 +95,7 @@ const MainLayout = () => {
             <div className="flex justify-between items-center h-16 px-4 border-b border-gray-700">
               <h1 className="text-white text-xl font-bold flex items-center">
                 <ArrowLeftRight className="mr-2 text-indigo-400" />
-                Gemini Chat
+                Multi-RoleAI
               </h1>
               <button 
                 className="md:hidden text-gray-400 hover:text-white"
@@ -156,14 +156,6 @@ const MainLayout = () => {
                 </button>
               </div>
               
-              {/* Debug area */}
-              <div className="px-4">
-                <h2 className="px-2 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  Debug Info
-                </h2>
-                <div id="debug-container" className="mb-4 px-3 py-2 text-xs bg-gray-700 text-gray-300 rounded-md max-h-24 overflow-y-auto thin-scrollbar">No debug messages</div>
-              </div>
-
               {/* Conversations list */}
               <div className="flex-1 overflow-y-auto p-2 thin-scrollbar">
                 <h2 className="px-2 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
@@ -230,7 +222,7 @@ const MainLayout = () => {
           </button>
           
           <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Gemini Chat
+            Multi-RoleAI
           </h1>
           
           <div className="flex items-center">

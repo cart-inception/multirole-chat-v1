@@ -39,11 +39,11 @@ const ChatHistory = ({ messages, isLoading }: ChatHistoryProps) => {
           </div>
           
           <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-3">
-            Welcome to Gemini Chat
+            Welcome to Multi-RoleAI
           </h3>
           
           <p className="mb-6 text-lg">
-            Ask anything or get creative with Google's advanced AI assistant
+            Ask anything or get creative with our advanced AI assistant
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-xl mx-auto mb-8">
@@ -104,7 +104,7 @@ const ChatHistory = ({ messages, isLoading }: ChatHistoryProps) => {
                 <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
                 <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" style={{ animationDelay: '0.4s' }}></div>
               </div>
-              <span className="ml-2 text-gray-500 text-sm">Gemini is thinking...</span>
+              <span className="ml-2 text-gray-500 text-sm">Assistant is thinking...</span>
             </div>
           </div>
         )}

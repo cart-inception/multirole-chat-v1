@@ -1,39 +1,16 @@
 import { useState } from 'react';
 import { Message } from '../../api/chat.api';
 import { User, Bot, Copy, Check, Clock } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import rehypeHighlight from 'rehype-highlight';
+import rehypeSanitize from 'rehype-sanitize';
+import remarkGfm from 'remark-gfm';
+import 'highlight.js/styles/github-dark.css';
+import type { Components } from 'react-markdown';
 
 interface MessageBubbleProps {
   message: Message;
 }
-
-// Function to detect and format code blocks in messages
-const formatMessageContent = (content: string) => {
-  // Split by code block markers
-  const parts = content.split(/```([\s\S]*?)```/);
-  
-  if (parts.length === 1) {
-    // No code blocks found, just return the text
-    return <p className="whitespace-pre-wrap">{content}</p>;
-  }
-  
-  return (
-    <>
-      {parts.map((part, index) => {
-        // Even indices are regular text, odd indices are code
-        if (index % 2 === 0) {
-          return part ? <p key={index} className="whitespace-pre-wrap mb-2">{part}</p> : null;
-        } else {
-          // This is a code block
-          return (
-            <div key={index} className="relative rounded-md bg-gray-800 text-gray-100 dark:bg-gray-900 dark:text-gray-200 font-mono text-sm p-3 my-2 overflow-x-auto">
-              <pre>{part}</pre>
-            </div>
-          );
-        }
-      })}
-    </>
-  );
-};
 
 const MessageBubble = ({ message }: MessageBubbleProps) => {
   const isAI = message.senderType === 'AI';
@@ -50,6 +27,65 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
     hour: '2-digit',
     minute: '2-digit',
   });
+
+  // Define custom components for markdown rendering
+  const markdownComponents: Components = {
+    // Style code blocks
+    code({ className, children, ...props }) {
+      const match = /language-(\w+)/.exec(className || '');
+      return match ? (
+        <div className="relative rounded-md bg-gray-800 text-gray-100 dark:bg-gray-900 dark:text-gray-200 my-2 overflow-x-auto">
+          <pre>
+            <code className={`language-${match[1]}`} {...props}>
+              {String(children).replace(/\n$/, '')}
+            </code>
+          </pre>
+        </div>
+      ) : (
+        <code className="px-1 py-0.5 bg-gray-200 dark:bg-gray-800 rounded text-sm" {...props}>
+          {children}
+        </code>
+      );
+    },
+    // Improve styling for lists
+    ul({ children }) {
+      return <ul className="list-disc pl-6 my-2">{children}</ul>;
+    },
+    ol({ children }) {
+      return <ol className="list-decimal pl-6 my-2">{children}</ol>;
+    },
+    // Add style for blockquotes
+    blockquote({ children }) {
+      return <blockquote className="border-l-4 border-gray-300 dark:border-gray-700 pl-4 italic text-gray-600 dark:text-gray-400 my-3">{children}</blockquote>;
+    },
+    // Style headings
+    h1({ children }) {
+      return <h1 className="text-xl font-bold my-3">{children}</h1>;
+    },
+    h2({ children }) {
+      return <h2 className="text-lg font-bold my-2">{children}</h2>;
+    },
+    h3({ children }) {
+      return <h3 className="text-md font-bold my-2">{children}</h3>;
+    },
+    // Style paragraphs
+    p({ children }) {
+      return <p className="mb-2 whitespace-pre-wrap">{children}</p>;
+    },
+    // Style tables
+    table({ children }) {
+      return <table className="border-collapse border border-gray-300 dark:border-gray-700 my-4 w-full">{children}</table>;
+    },
+    thead({ children }) {
+      return <thead className="bg-gray-100 dark:bg-gray-800">{children}</thead>;
+    },
+    th({ children }) {
+      return <th className="border border-gray-300 dark:border-gray-700 px-4 py-2 text-left">{children}</th>;
+    },
+    td({ children }) {
+      return <td className="border border-gray-300 dark:border-gray-700 px-4 py-2">{children}</td>;
+    }
+  };
   
   return (
     <div className={`flex w-full group animate-fade-in ${isAI ? 'justify-start' : 'justify-end'} mb-6`}>
@@ -63,8 +99,20 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
       )}
       
       <div className={`flex flex-col ${isAI ? 'items-start' : 'items-end'} max-w-[85%]`}>
-        <div className={`relative ${isAI ? 'message-bubble-ai' : 'message-bubble-user'}`}>
-          {formatMessageContent(message.content)}
+        <div className={`relative ${isAI ? 'message-bubble-ai' : 'message-bubble-user'} ${isAI ? 'prose prose-sm dark:prose-invert max-w-none' : ''}`}>
+          {isAI ? (
+            <div className="markdown-content">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeSanitize, rehypeHighlight]}
+                components={markdownComponents}
+              >
+                {message.content}
+              </ReactMarkdown>
+            </div>
+          ) : (
+            <p className="whitespace-pre-wrap">{message.content}</p>
+          )}
           
           {/* Copy button */}
           <button 
@@ -81,7 +129,7 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
         
         {/* Timestamp */}
         <div className={`flex items-center text-xs mt-1 px-2 ${isAI ? 'text-gray-500' : 'text-gray-500'}`}>
-          {isAI ? 'Gemini AI' : 'You'} <Clock size={12} className="mx-1" /> {formattedTime}
+          {isAI ? 'Assistant' : 'You'} <Clock size={12} className="mx-1" /> {formattedTime}
         </div>
       </div>
       

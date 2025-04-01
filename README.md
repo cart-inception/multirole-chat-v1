@@ -1,12 +1,12 @@
-# Gemini Chat Application
+# Multi-RoleAI Chat Application
 
-A full-stack web application that leverages Google's Gemini AI API to provide an interactive chat experience.
+A full-stack web application that leverages various AI models to provide an interactive chat experience.
 
 ## Features
 
 - User authentication (signup, login)
 - Persistent conversations
-- Real-time AI responses from Google's Gemini API
+- Real-time AI responses from multiple language models
 - Clean, responsive UI
 
 ## Tech Stack
@@ -17,7 +17,7 @@ A full-stack web application that leverages Google's Gemini AI API to provide an
 - PostgreSQL database
 - Prisma ORM
 - JSON Web Tokens for authentication
-- Google Generative AI SDK
+- Multiple AI model integrations
 
 ### Frontend
 - React
@@ -31,7 +31,7 @@ A full-stack web application that leverages Google's Gemini AI API to provide an
 
 - Node.js (LTS version)
 - PostgreSQL database
-- Google Gemini API key
+- API keys for supported AI models
 
 ## Setup Instructions
 
@@ -49,8 +49,8 @@ A full-stack web application that leverages Google's Gemini AI API to provide an
 
 3. Create a `.env` file in the backend directory with the following variables:
    ```
-   DATABASE_URL="postgresql://username:password@localhost:5432/gemini_chat_db"
-   GEMINI_API_KEY="your-gemini-api-key"
+   DATABASE_URL="postgresql://username:password@localhost:5432/multirole_ai_db"
+   AI_MODEL_API_KEYS="your-ai-model-api-keys"
    JWT_SECRET="your-secret-key-should-be-long-and-secure"
    PORT=5000
    ```

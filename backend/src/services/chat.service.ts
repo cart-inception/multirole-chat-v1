@@ -108,46 +108,52 @@ export class ChatService {
       }
 
       // Begin transaction to ensure both user message and AI response are saved together
-      return await prisma.$transaction(async (tx) => {
-        // Save the user's message
-        const userMessage = await tx.message.create({
-          data: {
-            conversationId: data.conversationId,
-            content: data.content,
-            senderType: SenderType.USER,
-          },
-        });
+      return await prisma.$transaction(
+        async (tx) => {
+          // Save the user's message
+          const userMessage = await tx.message.create({
+            data: {
+              conversationId: data.conversationId,
+              content: data.content,
+              senderType: SenderType.USER,
+            },
+          });
 
-        // Prepare conversation history for context
-        const history = conversation.messages.map(message => ({
-          role: message.senderType === SenderType.USER ? 'user' : 'model',
-          content: message.content,
-        }));
+          // Prepare conversation history for context
+          const history = conversation.messages.map(message => ({
+            role: message.senderType === SenderType.USER ? 'user' : 'model',
+            content: message.content,
+          }));
 
-        // Get AI response
-        const aiResponseContent = await geminiService.generateResponse(data.content, history);
+          // Get AI response
+          const aiResponseContent = await geminiService.generateResponse(data.content, history);
 
-        // Save the AI's response
-        const aiMessage = await tx.message.create({
-          data: {
-            conversationId: data.conversationId,
-            content: aiResponseContent,
-            senderType: SenderType.AI,
-          },
-        });
+          // Save the AI's response
+          const aiMessage = await tx.message.create({
+            data: {
+              conversationId: data.conversationId,
+              content: aiResponseContent,
+              senderType: SenderType.AI,
+            },
+          });
 
-        // Update conversation's updatedAt timestamp
-        await tx.conversation.update({
-          where: { id: data.conversationId },
-          data: { updatedAt: new Date() },
-        });
+          // Update conversation's updatedAt timestamp
+          await tx.conversation.update({
+            where: { id: data.conversationId },
+            data: { updatedAt: new Date() },
+          });
 
-        // Return both messages
-        return {
-          userMessage,
-          aiMessage,
-        };
-      });
+          // Return both messages
+          return {
+            userMessage,
+            aiMessage,
+          };
+        },
+        {
+          // Increase transaction timeout to 30 seconds to accommodate longer AI response times
+          timeout: 30000
+        }
+      );
     } catch (error) {
       if (error instanceof ApiError) throw error;
       console.error('Error sending message:', error);

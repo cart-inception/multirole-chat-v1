@@ -7,7 +7,7 @@ import { ApiError } from '../middleware/error.middleware';
  */
 export class GeminiService {
   private genAI: GoogleGenerativeAI | null = null;
-  private modelName = 'gemini-2.5-pro-exp-03-25'; // Updated to use gemini-2.5-pro model
+  private modelName = 'gemini-2.0-flash-thinking-exp-01-21'; // Updated to use gemini-2.5-pro model
   private useRealApi = true; // Set to true to use real API
 
   constructor() {
@@ -66,16 +66,25 @@ export class GeminiService {
       
       // Handle specific API errors (extend as needed)
       if (error instanceof Error) {
+        console.error('Detailed error message:', error.message);
+        console.error('Error stack:', error.stack);
+        
         if (error.message.includes('API key')) {
           throw new ApiError('Invalid API key or authorization error', 401);
         }
         if (error.message.includes('rate limit')) {
           throw new ApiError('Rate limit exceeded. Please try again later.', 429);
         }
+        if (error.message.includes('not found') || error.message.includes('does not exist')) {
+          throw new ApiError(`Model '${this.modelName}' not found. Please check the model name.`, 404);
+        }
+        if (error.message.includes('permission') || error.message.includes('access')) {
+          throw new ApiError('Permission denied to access this model or resource', 403);
+        }
       }
       
       // Generic error
-      throw new ApiError('Failed to generate AI response', 500);
+      throw new ApiError('Failed to generate AI response: ' + (error instanceof Error ? error.message : 'Unknown error'), 500);
     }
   }
   
