@@ -31,61 +31,106 @@ export class GeminiService {
    * @param history Optional conversation history for context
    */
   async generateResponse(prompt: string, history?: Array<{ role: string; content: string }>) {
-    try {
-      console.log(`Received prompt: "${prompt}"`);
-      
-      // Use mock implementation for testing
-      if (!this.useRealApi || !this.genAI) {
-        console.log('Using mock response');
-        // Wait a moment to simulate API latency
-        await new Promise(resolve => setTimeout(resolve, 500));
+    // Maximum number of retries for transient errors
+    const MAX_RETRIES = 3;
+    // Timeout in milliseconds (15 seconds)
+    const TIMEOUT_MS = 15000;
+    
+    let retryCount = 0;
+    let lastError: any = null;
+    
+    while (retryCount <= MAX_RETRIES) {
+      try {
+        console.log(`Received prompt: "${prompt}"${retryCount > 0 ? ` (retry ${retryCount}/${MAX_RETRIES})` : ''}`);
         
-        // Generate a mock response based on the prompt
-        return this.generateMockResponse(prompt);
-      }
-      
-      // Real API implementation (when useRealApi is true)
-      const model = this.genAI.getGenerativeModel({ model: this.modelName });
-      
-      // Configure the chat session
-      const chat = model.startChat({
-        history: history?.map(entry => ({
-          role: entry.role as 'user' | 'model',
-          parts: [{ text: entry.content }],
-        })) || [],
-      });
-      
-      // Send the user's prompt and get a response
-      const result = await chat.sendMessage(prompt);
-      const response = await result.response;
-      const text = response.text();
-      
-      return text;
-    } catch (error) {
-      console.error('Error in generateResponse:', error);
-      
-      // Handle specific API errors (extend as needed)
-      if (error instanceof Error) {
-        console.error('Detailed error message:', error.message);
-        console.error('Error stack:', error.stack);
+        // Use mock implementation for testing
+        if (!this.useRealApi || !this.genAI) {
+          console.log('Using mock response');
+          // Wait a moment to simulate API latency
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Generate a mock response based on the prompt
+          return this.generateMockResponse(prompt);
+        }
         
-        if (error.message.includes('API key')) {
-          throw new ApiError('Invalid API key or authorization error', 401);
+        // Real API implementation (when useRealApi is true)
+        const model = this.genAI.getGenerativeModel({ model: this.modelName });
+        
+        // Configure the chat session
+        const chat = model.startChat({
+          history: history?.map(entry => ({
+            role: entry.role as 'user' | 'model',
+            parts: [{ text: entry.content }],
+          })) || [],
+        });
+        
+        // Create a promise that will reject after the timeout
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('API request timed out')), TIMEOUT_MS);
+        });
+        
+        // Send the user's prompt and get a response with timeout
+        const result = await Promise.race([
+          chat.sendMessage(prompt),
+          timeoutPromise
+        ]) as any;
+        
+        const response = await result.response;
+        const text = response.text();
+        
+        return text;
+      } catch (error) {
+        lastError = error;
+        console.error(`Error in generateResponse (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, error);
+        
+        // Check if this is a retryable error (network issues, timeouts, rate limits)
+        const isRetryable = error instanceof Error && (
+          error.message.includes('timeout') ||
+          error.message.includes('network') ||
+          error.message.includes('rate limit') ||
+          error.message.includes('ECONNRESET') ||
+          error.message.includes('ETIMEDOUT') ||
+          error.message.includes('429') // HTTP 429 Too Many Requests
+        );
+        
+        if (isRetryable && retryCount < MAX_RETRIES) {
+          // Exponential backoff: wait longer between each retry
+          const backoffMs = Math.min(1000 * Math.pow(2, retryCount), 8000);
+          console.log(`Retrying in ${backoffMs}ms...`);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+          retryCount++;
+          continue;
         }
-        if (error.message.includes('rate limit')) {
-          throw new ApiError('Rate limit exceeded. Please try again later.', 429);
+        
+        // Handle specific API errors (extend as needed)
+        if (error instanceof Error) {
+          console.error('Detailed error message:', error.message);
+          console.error('Error stack:', error.stack);
+          
+          if (error.message.includes('API key')) {
+            throw new ApiError('Invalid API key or authorization error', 401);
+          }
+          if (error.message.includes('rate limit')) {
+            throw new ApiError('Rate limit exceeded. Please try again later.', 429);
+          }
+          if (error.message.includes('not found') || error.message.includes('does not exist')) {
+            throw new ApiError(`Model '${this.modelName}' not found. Please check the model name.`, 404);
+          }
+          if (error.message.includes('permission') || error.message.includes('access')) {
+            throw new ApiError('Permission denied to access this model or resource', 403);
+          }
+          if (error.message.includes('timeout')) {
+            throw new ApiError('Request to AI service timed out. Please try again.', 504);
+          }
         }
-        if (error.message.includes('not found') || error.message.includes('does not exist')) {
-          throw new ApiError(`Model '${this.modelName}' not found. Please check the model name.`, 404);
-        }
-        if (error.message.includes('permission') || error.message.includes('access')) {
-          throw new ApiError('Permission denied to access this model or resource', 403);
-        }
+        
+        // If we've reached this point, we've either exhausted retries or encountered a non-retryable error
+        throw new ApiError('Failed to generate AI response: ' + (error instanceof Error ? error.message : 'Unknown error'), 500);
       }
-      
-      // Generic error
-      throw new ApiError('Failed to generate AI response: ' + (error instanceof Error ? error.message : 'Unknown error'), 500);
     }
+    
+    // This should never be reached due to the while loop and throw statements above
+    throw new ApiError('Failed to generate AI response after multiple attempts', 500);
   }
   
   /**

@@ -32,6 +32,9 @@ export interface MessagesResponse {
   userMessage: Message;
   aiMessage?: Message;
   error?: string;
+  processingStatus?: 'processing';
+  retryable?: boolean;
+  message?: string;
 }
 
 // Chat API service

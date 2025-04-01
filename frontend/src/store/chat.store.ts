@@ -189,23 +189,73 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Send a message and handle the response
   sendMessage: async (data) => {
     try {
-      set({ isLoading: true, error: null });
+      // Create a temporary message to show immediately in the UI
+      const tempUserMessage: Message = {
+        id: `temp-${Date.now()}`,
+        conversationId: data.conversationId,
+        content: data.content,
+        senderType: 'USER',
+        timestamp: new Date().toISOString(),
+      };
       
+      // Optimistically update the UI with the user's message
+      set((state) => {
+        if (state.currentConversation?.id === data.conversationId) {
+          return {
+            currentConversation: {
+              ...state.currentConversation,
+              messages: [
+                ...(state.currentConversation.messages || []),
+                tempUserMessage,
+              ],
+            },
+            isLoading: true,
+            error: null,
+          };
+        }
+        return { isLoading: true, error: null };
+      });
+      
+      // Now send the actual API request
       const response = await ChatApi.sendMessage(data);
-      const { userMessage, aiMessage, error: aiError } = response.data;
+      const { 
+        userMessage, 
+        aiMessage, 
+        error: aiError, 
+        processingStatus, 
+        retryable, 
+        message 
+      } = response.data;
       
-      // Update conversation with new messages
+      // Update conversation with the real messages (replacing the temp one)
       set((state) => {
         // Handle case when the current conversation is the one being updated
         if (state.currentConversation?.id === data.conversationId) {
-          const updatedMessages = [
-            ...(state.currentConversation.messages || []),
-            userMessage,
-          ];
+          // Filter out the temporary message
+          const filteredMessages = state.currentConversation.messages?.filter(
+            msg => msg.id !== tempUserMessage.id
+          ) || [];
+          
+          // Add the real user message
+          const updatedMessages = [...filteredMessages, userMessage];
           
           // Only add AI message if it exists (not failed)
           if (aiMessage) {
             updatedMessages.push(aiMessage);
+          }
+          
+          // If we're in a processing state, don't show an error yet
+          // The frontend can poll for updates or retry
+          if (processingStatus === 'processing' && retryable) {
+            return {
+              currentConversation: {
+                ...state.currentConversation,
+                messages: updatedMessages,
+              },
+              isLoading: false,
+              // Don't set an error for retryable/processing status
+              error: null,
+            };
           }
           
           return {
@@ -219,9 +269,66 @@ export const useChatStore = create<ChatState>((set, get) => ({
           };
         }
         
+        // If we're in a processing state, don't show an error yet
+        if (processingStatus === 'processing' && retryable) {
+          return { isLoading: false, error: null };
+        }
+        
         return { isLoading: false, error: aiError || null };
       });
+      
+      // If we're in a processing state and it's retryable, try again after a delay
+      if (processingStatus === 'processing' && retryable) {
+        // Wait 2 seconds before retrying
+        setTimeout(async () => {
+          try {
+            // Silently fetch the conversation to see if the AI response has arrived
+            const conversation = await get().silentlyFetchConversation(data.conversationId);
+            
+            // Update the current conversation with the latest data
+            set({ currentConversation: conversation });
+          } catch (error) {
+            console.error('Error retrying to fetch conversation:', error);
+            // Only set an error after retry fails
+            set({ 
+              error: 'The AI service is taking longer than expected to respond. Please try again later.' 
+            });
+          }
+        }, 2000);
+      }
     } catch (error: any) {
+      // Don't immediately show network errors to the user
+      // These might be transient issues that resolve themselves
+      if (error.message?.includes('network') || 
+          error.message?.includes('timeout') || 
+          error.status === 429 || 
+          error.status === 504) {
+        console.warn('Transient error during message send, will retry:', error);
+        
+        // Try silently fetching the conversation after a short delay
+        setTimeout(async () => {
+          try {
+            if (!data.conversationId) return;
+            
+            const conversation = await get().silentlyFetchConversation(data.conversationId);
+            set({ 
+              currentConversation: conversation,
+              isLoading: false,
+              error: null
+            });
+          } catch (retryError) {
+            // Only show error after retry fails
+            const errorMessage = error.response?.data?.message || 'Failed to send message';
+            set({ error: errorMessage, isLoading: false });
+          }
+        }, 1000);
+        
+        // Don't show an error yet
+        set({ isLoading: false });
+        return;
+      }
+      
+      // For other errors, show them immediately
       const errorMessage = error.response?.data?.message || 'Failed to send message';
       set({ error: errorMessage, isLoading: false });
     }

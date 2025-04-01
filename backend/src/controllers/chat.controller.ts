@@ -80,7 +80,7 @@ class ChatController {
       }
       
       const conversationId = req.params.id;
-      const conversation = await chatService.getConversation(req.user.id, conversationId);
+      const conversation = await chatService.getConversation(conversationId, req.user.id);
       
       return res.status(200).json({
         success: true,

@@ -152,8 +152,28 @@ export class ChatService {
       } catch (error) {
         console.error("Error generating or saving AI response:", error);
         
-        // Even if AI response fails, we want to return the user message
-        // and indicate there was a problem with AI response
+        // Determine if this is a transient error that might resolve itself
+        const isTransientError = error instanceof Error && (
+          error.message.includes('timeout') ||
+          error.message.includes('network') ||
+          error.message.includes('rate limit') ||
+          error.message.includes('ECONNRESET') ||
+          error.message.includes('ETIMEDOUT') ||
+          error.message.includes('429') // HTTP 429 Too Many Requests
+        );
+        
+        // For transient errors, don't immediately show an error to the user
+        // Instead, indicate that the system is still trying
+        if (isTransientError) {
+          return {
+            userMessage,
+            processingStatus: 'processing',
+            retryable: true,
+            message: 'The AI service is taking longer than expected to respond. Please wait a moment and try again.'
+          };
+        }
+        
+        // For permanent errors, provide a clear error message
         return {
           userMessage,
           error: error instanceof ApiError 

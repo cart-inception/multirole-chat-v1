@@ -48,7 +48,7 @@ const ChatPage = () => {
     let pollCount = 0; // Track poll count inside the effect
     
     if (isPolling && conversationId) {
-      // Poll every 2 seconds for up to 60 seconds (30 polls)
+      // Poll every 500ms for up to 60 seconds (120 polls)
       pollingInterval = window.setInterval(() => {
         silentlyFetchConversation(conversationId)
           .then((conversation) => {
@@ -58,8 +58,8 @@ const ChatPage = () => {
             const messages = conversation?.messages || [];
             
             // Stop polling if we have at least 2 messages (user + AI) and the last one is from AI
-            // or if we've polled 30 times (60 seconds)
-            if ((messages.length >= 2 && messages[messages.length - 1]?.senderType === 'AI') || pollCount >= 30) {
+            // or if we've polled 120 times (60 seconds)
+            if ((messages.length >= 2 && messages[messages.length - 1]?.senderType === 'AI') || pollCount >= 120) {
               console.log(`Polling complete after ${pollCount} attempts`);
               setIsPolling(false);
               if (pollingInterval) {
@@ -70,7 +70,7 @@ const ChatPage = () => {
           .catch(() => {
             // If there's an error, increment the poll count
             pollCount++;
-            if (pollCount >= 30) {
+            if (pollCount >= 120) {
               console.log(`Polling stopped after ${pollCount} attempts due to errors`);
               setIsPolling(false);
               if (pollingInterval) {
@@ -78,7 +78,7 @@ const ChatPage = () => {
               }
             }
           });
-      }, 2000);
+      }, 500); // Reduced from 2000ms to 500ms
     }
     
     return () => {
@@ -138,6 +138,7 @@ const ChatPage = () => {
                 <ChatHistory
                   messages={currentConversation?.messages || []}
                   isLoading={isLoading}
+                  onSendMessage={handleSendMessage}
                 />
               </>
             ) : (

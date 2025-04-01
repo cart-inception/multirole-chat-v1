@@ -6,9 +6,10 @@ import { Bot, Zap, BrainCircuit } from 'lucide-react';
 interface ChatHistoryProps {
   messages: Message[];
   isLoading: boolean;
+  onSendMessage?: (message: string) => void;
 }
 
-const ChatHistory = ({ messages, isLoading }: ChatHistoryProps) => {
+const ChatHistory = ({ messages, isLoading, onSendMessage }: ChatHistoryProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -26,6 +27,13 @@ const ChatHistory = ({ messages, isLoading }: ChatHistoryProps) => {
     "What are the best practices for sustainable living?",
     "Help me plan a 7-day itinerary for Japan"
   ];
+  
+  // Handle suggestion click
+  const handleSuggestionClick = (suggestion: string) => {
+    if (onSendMessage) {
+      onSendMessage(suggestion);
+    }
+  };
   
   // If no messages yet, show a welcome/instructions message
   if (messages.length === 0 && !isLoading) {
@@ -51,6 +59,7 @@ const ChatHistory = ({ messages, isLoading }: ChatHistoryProps) => {
               <button
                 key={index}
                 className="text-left p-3 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-sm"
+                onClick={() => handleSuggestionClick(suggestion)}
               >
                 {suggestion}
               </button>
