@@ -1,83 +1,85 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth.store';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Alert from '../ui/Alert';
 
 const LoginForm = () => {
-  const { login, isLoading, error, clearError } = useAuthStore();
+  const navigate = useNavigate();
+  const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
   
-  // Form state
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
+  // Fixed test credentials for quick login
+  const [email, setEmail] = useState('test@example.com');
+  const [password, setPassword] = useState('Password123!');
+  const [message, setMessage] = useState('');
   
-  // Form validation state
-  const [formErrors, setFormErrors] = useState({
-    email: '',
-    password: '',
-  });
-  
-  // Handle input changes
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    
-    // Clear field error when user starts typing
-    if (formErrors[name as keyof typeof formErrors]) {
-      setFormErrors((prev) => ({ ...prev, [name]: '' }));
+  // Update debug area in sidebar
+  const updateDebug = (debugMessage: string) => {
+    const debugContainer = document.getElementById('debug-container');
+    if (debugContainer) {
+      debugContainer.innerHTML = debugMessage;
     }
   };
   
-  // Validate form
-  const validateForm = (): boolean => {
-    let valid = true;
-    const newErrors = { ...formErrors };
-    
-    // Validate email
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-      valid = false;
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
-      valid = false;
+  // Check if already authenticated
+  useEffect(() => {
+    updateDebug(`Checking authentication state: ${isAuthenticated ? 'authenticated' : 'not authenticated'}`);
+    if (isAuthenticated) {
+      updateDebug('User is already authenticated, redirecting to /chat');
+      navigate('/chat');
     }
-    
-    // Validate password
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-      valid = false;
-    }
-    
-    setFormErrors(newErrors);
-    return valid;
-  };
+  }, [isAuthenticated, navigate]);
   
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Handle direct login with fixed credentials (for testing)
+  const handleDirectLogin = () => {
+    setMessage("Attempting direct login...");
+    updateDebug(`Direct login with: ${email}`);
     
-    // Clear any previous error
-    clearError();
-    
-    // Validate form
-    if (!validateForm()) return;
-    
-    try {
-      // Attempt login
-      await login(formData);
-    } catch (error) {
-      // Error handling is done in the store
-      console.error('Login failed', error);
-    }
+    // Manual localStorage approach to avoid potential issues with the store
+    fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    })
+      .then(response => {
+        updateDebug(`Login response status: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`Login failed with status ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        updateDebug(`Login successful: ${JSON.stringify(data.data.user.username)}`);
+        setMessage("Login successful! Redirecting...");
+        
+        // Store auth data in localStorage
+        localStorage.setItem('token', data.data.token);
+        localStorage.setItem('user', JSON.stringify(data.data.user));
+        
+        // Force page reload to apply authentication
+        setTimeout(() => {
+          window.location.href = '/chat';
+        }, 1000);
+      })
+      .catch(err => {
+        updateDebug(`Login error: ${err.message}`);
+        setMessage(`Login failed: ${err.message}`);
+      });
   };
   
   return (
-    <form className="space-y-6" onSubmit={handleSubmit}>
+    <div className="space-y-6">
       {error && (
         <Alert type="error" message={error} onClose={clearError} />
+      )}
+      
+      {message && (
+        <div className="p-3 bg-blue-100 text-blue-800 rounded-lg">
+          {message}
+        </div>
       )}
       
       <div>
@@ -86,11 +88,9 @@ const LoginForm = () => {
           name="email"
           type="email"
           autoComplete="email"
-          required
           label="Email address"
-          value={formData.email}
-          onChange={handleChange}
-          error={formErrors.email}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
         />
       </div>
       
@@ -100,20 +100,19 @@ const LoginForm = () => {
           name="password"
           type="password"
           autoComplete="current-password"
-          required
           label="Password"
-          value={formData.password}
-          onChange={handleChange}
-          error={formErrors.password}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
         />
       </div>
       
       <div>
         <Button
-          type="submit"
+          type="button" // Changed to button type to disable form submission
           variant="primary"
           fullWidth
           isLoading={isLoading}
+          onClick={handleDirectLogin}
         >
           Sign in
         </Button>
@@ -125,7 +124,7 @@ const LoginForm = () => {
           Sign up
         </Link>
       </div>
-    </form>
+    </div>
   );
 };
 

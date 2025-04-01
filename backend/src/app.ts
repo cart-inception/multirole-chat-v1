@@ -10,11 +10,23 @@ import config from './config';
 const app: Express = express();
 
 // Apply middleware
-app.use(helmet()); // Security headers
-app.use(cors({
-  origin: config.cors.origin,
-  credentials: true,
+// Modify helmet settings to allow CORS
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
+
+// Enhanced CORS settings
+app.use(cors({
+  origin: config.cors.origin || '*',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
+// Log CORS config
+console.log('CORS configuration:', {
+  origin: config.cors.origin || '*'
+});
 app.use(morgan('dev')); // Logging
 app.use(express.json()); // Parse JSON request bodies
 

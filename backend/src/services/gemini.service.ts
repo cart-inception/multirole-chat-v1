@@ -4,19 +4,28 @@ import { ApiError } from '../middleware/error.middleware';
 
 /**
  * Service for interacting with the Google Gemini API
+ * 
+ * MODIFIED FOR TESTING: This implementation uses a mock response
+ * instead of actually calling the Gemini API
  */
 export class GeminiService {
-  private genAI: GoogleGenerativeAI;
+  private genAI: GoogleGenerativeAI | null = null;
   private modelName = 'gemini-pro'; // Using gemini-pro model
+  private useRealApi = false; // Set to true to use real API
 
   constructor() {
-    // Check if API key is configured
-    if (!config.gemini.apiKey) {
-      console.error('Gemini API key not found. Please set GEMINI_API_KEY in .env file.');
+    // Check if API key is configured and we want to use the real API
+    if (this.useRealApi) {
+      if (!config.gemini.apiKey) {
+        console.error('Gemini API key not found. Please set GEMINI_API_KEY in .env file.');
+      } else {
+        // Initialize the Google Generative AI client
+        this.genAI = new GoogleGenerativeAI(config.gemini.apiKey || '');
+        console.log('Using real Gemini API');
+      }
+    } else {
+      console.log('Using mock Gemini API implementation');
     }
-    
-    // Initialize the Google Generative AI client
-    this.genAI = new GoogleGenerativeAI(config.gemini.apiKey || '');
   }
 
   /**
@@ -26,7 +35,19 @@ export class GeminiService {
    */
   async generateResponse(prompt: string, history?: Array<{ role: string; content: string }>) {
     try {
-      // Get the model instance
+      console.log(`Received prompt: "${prompt}"`);
+      
+      // Use mock implementation for testing
+      if (!this.useRealApi || !this.genAI) {
+        console.log('Using mock response');
+        // Wait a moment to simulate API latency
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Generate a mock response based on the prompt
+        return this.generateMockResponse(prompt);
+      }
+      
+      // Real API implementation (when useRealApi is true)
       const model = this.genAI.getGenerativeModel({ model: this.modelName });
       
       // Configure the chat session
@@ -44,7 +65,7 @@ export class GeminiService {
       
       return text;
     } catch (error) {
-      console.error('Error calling Gemini API:', error);
+      console.error('Error in generateResponse:', error);
       
       // Handle specific API errors (extend as needed)
       if (error instanceof Error) {
@@ -59,6 +80,27 @@ export class GeminiService {
       // Generic error
       throw new ApiError('Failed to generate AI response', 500);
     }
+  }
+  
+  /**
+   * Generate a mock response for testing purposes
+   */
+  private generateMockResponse(prompt: string): string {
+    // Basic pattern matching for some common queries
+    if (prompt.toLowerCase().includes('hello') || prompt.toLowerCase().includes('hi')) {
+      return "Hello! I'm a simplified mock version of the Gemini AI. How can I help you today?";
+    }
+    
+    if (prompt.toLowerCase().includes('?')) {
+      return `That's an interesting question about "${prompt.replace('?', '')}". As a mock AI, I would normally provide a thoughtful answer here based on my training data.`;
+    }
+    
+    if (prompt.toLowerCase().includes('help')) {
+      return "I'd be happy to help! Please let me know what specific information or assistance you need.";
+    }
+    
+    // Default response
+    return `I received your message: "${prompt}"\n\nIn a real implementation, I would generate a contextually relevant response based on your input and any conversation history. This is just a mock response for testing the chat interface.`;
   }
 }
 

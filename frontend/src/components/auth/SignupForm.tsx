@@ -83,23 +83,57 @@ const SignupForm = () => {
     return valid;
   };
   
+  // Update debug area in sidebar
+  const updateDebug = (debugMessage: string) => {
+    const debugContainer = document.getElementById('debug-container');
+    if (debugContainer) {
+      debugContainer.innerHTML = debugMessage;
+    }
+  };
+
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    updateDebug(`Signup form submitted with: ${formData.username}, ${formData.email}`);
     
     // Clear any previous error
     clearError();
     
     // Validate form
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      updateDebug('Form validation failed: ' + 
+        Object.entries(formErrors)
+          .filter(([_, value]) => value)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join(', ')
+      );
+      return;
+    }
+    
+    // Disable form submission while loading to prevent focus issues
+    if (isLoading) {
+      updateDebug('Already processing signup request');
+      return;
+    }
     
     try {
+      updateDebug(`Attempting signup with API URL: ${import.meta.env.VITE_API_BASE_URL}`);
+      
       // Submit only username, email, and password (not confirmPassword)
       const { confirmPassword, ...signupData } = formData;
-      await signup(signupData);
-    } catch (error) {
-      // Error handling is done in the store
-      console.error('Signup failed', error);
+      
+      // Clean up data
+      const cleanData = {
+        username: signupData.username.trim(),
+        email: signupData.email.trim(),
+        password: signupData.password
+      };
+      
+      await signup(cleanData);
+      updateDebug('Signup successful');
+    } catch (error: any) {
+      // Add more detailed error logging
+      updateDebug(`Signup failed: ${error.message}`);
     }
   };
   

@@ -1,6 +1,5 @@
-import { useState, FormEvent, KeyboardEvent } from 'react';
+import { useState } from 'react';
 import { Send } from 'lucide-react';
-import Button from '../ui/Button';
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -11,54 +10,77 @@ interface ChatInputProps {
 const ChatInput = ({ onSendMessage, isLoading, disabled = false }: ChatInputProps) => {
   const [message, setMessage] = useState('');
 
-  // Handle form submission
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (message.trim() && !isLoading) {
-      onSendMessage(message);
-      setMessage('');
+  // Update debug area in sidebar instead of local state
+  const updateDebug = (debugMessage: string) => {
+    const debugContainer = document.getElementById('debug-container');
+    if (debugContainer) {
+      debugContainer.innerHTML = debugMessage;
     }
   };
 
-  // Handle keyboard shortcuts (Ctrl+Enter to submit)
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && message.trim() && !isLoading) {
-      e.preventDefault();
-      onSendMessage(message);
-      setMessage('');
+  // Simple form submission handler
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateDebug(`Attempting to send message: "${message}"`);
+    
+    if (message.trim() && !isLoading && !disabled) {
+      try {
+        onSendMessage(message);
+        updateDebug(`Message sent: "${message}"`);
+        setMessage('');
+      } catch (error) {
+        updateDebug(`Error sending message: ${error}`);
+      }
+    } else {
+      updateDebug(`Cannot send: isLoading=${isLoading}, disabled=${disabled}, message empty=${!message.trim()}`);
+    }
+  };
+
+  // Direct send button handler to bypass form submission
+  const handleSendClick = () => {
+    updateDebug(`Clicked send button with message: "${message}"`);
+    if (message.trim() && !isLoading && !disabled) {
+      try {
+        onSendMessage(message);
+        updateDebug(`Message sent via button: "${message}"`);
+        setMessage('');
+      } catch (error) {
+        updateDebug(`Error sending message via button: ${error}`);
+      }
     }
   };
 
   return (
-    <form 
-      onSubmit={handleSubmit}
-      className="flex flex-col p-4 border-t border-gray-200 bg-white"
-    >
-      <div className="relative">
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={isLoading || disabled}
-          placeholder="Type your message here..."
-          className="w-full px-4 py-3 pr-16 text-gray-900 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 resize-none"
-          rows={3}
-        />
-        <Button
-          type="submit"
-          disabled={isLoading || !message.trim() || disabled}
-          isLoading={isLoading}
-          className="absolute bottom-3 right-3"
-          variant="primary"
-          size="sm"
-        >
-          <Send size={16} />
-        </Button>
-      </div>
-      <div className="mt-2 text-xs text-gray-500 text-right">
-        Press Ctrl+Enter to send
-      </div>
-    </form>
+    <div className="sticky bottom-0 w-full bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 shadow-md">
+      
+      <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+        <div className="flex">
+          {/* Simple input that should work reliably */}
+          <input
+            type="text"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Type a message..."
+            className="flex-grow p-2 border border-gray-300 dark:border-gray-600 rounded-l-md text-gray-900 dark:text-white bg-white dark:bg-gray-800 placeholder-gray-400 dark:placeholder-gray-500"
+            disabled={isLoading || disabled}
+          />
+          
+          {/* Simple button that should work reliably */}
+          <button
+            type="button"
+            onClick={handleSendClick}
+            disabled={isLoading || disabled || !message.trim()}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-r-md hover:bg-indigo-700 disabled:opacity-50"
+          >
+            <Send size={16} />
+          </button>
+        </div>
+        
+        <div className="text-right text-sm text-gray-500">
+          {isLoading ? "Processing..." : disabled ? "Chat disabled" : "Ready to send"}
+        </div>
+      </form>
+    </div>
   );
 };
 

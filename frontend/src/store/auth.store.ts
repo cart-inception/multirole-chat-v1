@@ -19,23 +19,63 @@ interface AuthState {
 }
 
 // Create the auth store with persistence
+// Helper function to load initial auth state from localStorage
+const loadInitialState = () => {
+  const token = localStorage.getItem('token');
+  let user = null;
+  
+  try {
+    const userJson = localStorage.getItem('user');
+    if (userJson) {
+      user = JSON.parse(userJson);
+    }
+  } catch (e) {
+    console.error('Failed to parse user from localStorage', e);
+  }
+  
+  return {
+    token,
+    user,
+    isAuthenticated: !!token && !!user,
+  };
+};
+
+const initialState = loadInitialState();
+console.log('Auth store: initializing with state:', initialState);
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-      // Initial state
-      user: null,
-      token: null,
-      isAuthenticated: false,
+      // Initial state from localStorage
+      user: initialState.user,
+      token: initialState.token,
+      isAuthenticated: initialState.isAuthenticated,
       isLoading: false,
       error: null,
       
       // Login action
       login: async (credentials) => {
         try {
+          console.log('Auth store: login action started');
           set({ isLoading: true, error: null });
           
+          console.log('Auth store: calling API');
           const response = await AuthApi.login(credentials);
+          console.log('Auth store: API response received:', response);
+          
+          if (!response.data) {
+            console.error('Auth store: response.data is missing');
+            throw new Error('Invalid response format');
+          }
+          
           const { user, token } = response.data;
+          
+          // Store token in localStorage for API interceptors
+          localStorage.setItem('token', token);
+          console.log('Auth store: token saved to localStorage');
+          
+          // Store user in localStorage too for persistence
+          localStorage.setItem('user', JSON.stringify(user));
           
           set({
             user,
@@ -43,7 +83,18 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: true,
             isLoading: false,
           });
+          console.log('Auth store: state updated, user is authenticated');
+          
+          // Force redirect to chat page
+          window.location.href = '/chat';
         } catch (error: any) {
+          console.error('Auth store: login error:', error);
+          console.error('Auth store: error details:', {
+            data: error.response?.data,
+            status: error.response?.status,
+            message: error.message
+          });
+          
           const errorMessage = error.response?.data?.message || 'Login failed';
           set({ 
             error: errorMessage,
@@ -52,6 +103,7 @@ export const useAuthStore = create<AuthState>()(
             user: null,
             token: null,
           });
+          console.log('Auth store: state updated with error:', errorMessage);
           throw new Error(errorMessage);
         }
       },
@@ -85,12 +137,21 @@ export const useAuthStore = create<AuthState>()(
       
       // Logout action
       logout: () => {
+        console.log('Auth store: logging out');
+        
+        // Clear localStorage
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        
         set({
           user: null,
           token: null,
           isAuthenticated: false,
           error: null,
         });
+        
+        // Redirect to login page
+        window.location.href = '/login';
       },
       
       // Clear error action

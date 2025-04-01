@@ -9,38 +9,42 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, fullWidth = true, className = '', ...props }, ref) => {
-    // Base classes for all inputs
-    const baseClasses = 'block px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm';
+    // Base classes with improved text contrast
+    const baseClasses = 'block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm';
+    
+    // Text and background colors with dark mode support - ensuring proper text contrast
+    const textClasses = 'text-gray-900 dark:text-white bg-white dark:bg-gray-800 placeholder-gray-400 dark:placeholder-gray-500'
     
     // Classes based on error state
     const borderClasses = error
-      ? 'border-red-300 text-red-900 placeholder-red-300'
-      : 'border-gray-300';
-    
-    // Width classes
-    const widthClasses = fullWidth ? 'w-full' : '';
+      ? 'border-red-300 dark:border-red-500 focus:ring-red-500 dark:focus:ring-red-500'
+      : 'border-gray-300 dark:border-gray-600';
     
     return (
       <div className={fullWidth ? 'w-full' : ''}>
         {label && (
-          <label htmlFor={props.id} className="block text-sm font-medium text-gray-700 mb-1">
+          <label 
+            htmlFor={props.id} 
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          >
             {label}
           </label>
         )}
-        <div className="relative rounded-md shadow-sm">
+        <div className="relative">
           <input
             ref={ref}
             className={`
               ${baseClasses}
+              ${textClasses}
               ${borderClasses}
-              ${widthClasses}
               ${className}
             `}
+            autoComplete={props.autoComplete || 'off'}
             {...props}
           />
         </div>
         {error && (
-          <p className="mt-1 text-sm text-red-600" id={`${props.id}-error`}>
+          <p className="mt-1 text-sm text-red-600 dark:text-red-400" id={`${props.id}-error`}>
             {error}
           </p>
         )}
