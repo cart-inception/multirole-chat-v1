@@ -9,10 +9,10 @@ const prisma = new PrismaClient();
 const port = config.port;
 
 // Start the server
-const server = app.listen(port, () => {
+const server = app.listen(port, '0.0.0.0', () => {
   console.log(`Server started on port ${port}`);
-  console.log(`Health check available at: http://localhost:${port}/api/health`);
-  console.log(`API available at: http://localhost:${port}/api`);
+  console.log(`Health check available at: http://0.0.0.0:${port}/api/health`);
+  console.log(`API available at: http://0.0.0.0:${port}/api`);
 });
 
 // Handle graceful shutdown
