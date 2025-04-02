@@ -1,0 +1,15 @@
+{
+  "name": "multirole-chat",
+  "version": "1.0.0",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "start": "npm run start --workspace=backend",
+    "dev": "concurrently \"npm run dev --workspace=frontend\" \"npm run dev --workspace=backend\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
